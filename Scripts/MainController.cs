@@ -20,9 +20,13 @@ public class MainController : MonoBehaviour
 {
     private GameObject[] items;
     private Vector3[] initialPositions;
-    private GetHelper get;
     public Camera cam;
     private bool once = false;
+    private float leapData;
+    public Material[] materials;
+    public Renderer rend;
+    public float changeInterval = 0.33F;
+
     void Awake()
     {
         items = GameObject.FindGameObjectsWithTag("Item");
@@ -33,7 +37,6 @@ public class MainController : MonoBehaviour
         }
     }
 
-    
     void Start()
     {
         if (cam == null)
@@ -45,11 +48,33 @@ public class MainController : MonoBehaviour
             // Tie this to the camera, and do not keep the local orientation.
             transform.SetParent(cam.GetComponent<Transform>(), true);
         }
-        get = GameObject.Find("get").GetComponentInChildren<GetHelper>();
-        M2XSchema res = get.m2x();
+        rend = GetComponent<Renderer>();
+        rend.enabled = true;
 
-        Debug.Log("This is res " + res.ToString());
+        InvokeRepeating("getLeapData", 1.5f, 0.5f);
+    }
 
+    void Update()
+    {
+        if (materials.Length == 0)
+            return;
+
+        // we want this material index now
+        int index = Mathf.FloorToInt(Time.time / changeInterval);
+
+        // take a modulo with materials count so that animation repeats
+        index = index % materials.Length;
+
+        // assign it to the renderer
+        rend.sharedMaterial = materials[index];
+    }
+
+    void getLeapData()
+    {
+        GetHelper get = GameObject.Find("get").GetComponentInChildren<GetHelper>();
+        M2XSchema m2xData = get.m2x();
+        leapData = m2xData.Value;
+        Debug.Log("Got value" + leapData);
     }
 
     void LateUpdate()
@@ -60,21 +85,30 @@ public class MainController : MonoBehaviour
         for (int i = 0; i < items.Length; i++)
         {
             GvrAudioSource src = items[i].GetComponentInChildren<GvrAudioSource>();
-            float updown = cam.transform.rotation.x;
-            src.volume = 0.5f - updown;
-            //Debug.Log(0.5 - updown);
+            //updown = cam.transform.rotation.x;
+            //src.volume = 0.5f - updown;
+            
+         //   Debug.Log("volume: " + src.volume);
+
             if (items[i].transform.position.Equals(initialPositions[i]))
                 items[i].transform.position = initialPositions[i];
         }
         if (go_focus)
         {
+            GvrAudioSource src = go_focus.GetChild(0).GetComponent<GvrAudioSource>();
+
             if (!once)
             {
                 go_focus.position = Vector3.MoveTowards(go_focus.transform.position, cam.transform.position, 2f);
-                GvrAudioSource src = go_focus.GetChild(0).GetComponent<GvrAudioSource>();
                 src.Play();
                 //Debug.Log(src.volume);
             }
+            if (leapData > 75 && leapData < 400)
+            {
+                src.volume = leapData / 300 > 1 ? 1 : leapData / 300;
+            }
+            if (leapData < 75)
+                src.volume = 0;
 
             once = true;
         }
